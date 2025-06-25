@@ -1,197 +1,213 @@
-# Speech Emotion Recognition using Pre-trained CNN Models
-
-This repository implements a **Speech Emotion Recognition** system that classifies emotions from audio signals using three pre-trained CNN backbones: **ResNet101**, **VGG16**, and **VGG19**, on the RAVDESS dataset.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Dataset](#dataset)
-3. [Methodology](#methodology)
-
-   * Data Preprocessing
-   * Feature Extraction
-   * Model Architectures
-4. [Installation & Usage](#installation--usage)
-
-   * Dependencies
-   * Running the Code
-5. [Evaluation Results](#evaluation-results)
-
-   * Overall Metrics
-   * Detailed Per-Model Classification Reports
-6. [Technical Implementation](#technical-implementation)
-7. [Acknowledgements](#acknowledgements)
-
----
+# Speech Emotion Recognition using Deep Learning with Pre-trained CNN Models
 
 ## Overview
 
-The goal is to build an end-to-end pipeline that:
-
-* Loads and preprocesses audio data.
-* Extracts features (mel-spectrograms, MFCCs).
-* Trains and evaluates pre-trained CNN models for emotion classification.
-
----
+This project implements a comprehensive speech emotion recognition system using state-of-the-art pre-trained convolutional neural networks (CNNs), including **ResNet101**, **VGG16**, and **VGG19**. The system processes audio signals from the **RAVDESS** (Ryerson Audio-Visual Database of Emotional Speech and Song) dataset to classify emotions with high accuracy, employing advanced feature extraction and data augmentation techniques.
 
 ## Dataset
 
-* **RAVDESS** (Ryerson Audio-Visual Database of Emotional Speech and Song)
+The project utilizes the RAVDESS dataset, which contains:
 
-  * **7,356** recordings from **24** actors (12 female, 12 male)
-  * Two neutral North American English statements
-  * 8 emotion classes: Neutral, Calm, Happy, Sad, Angry, Fearful, Disgust, Surprised
-  * 16-bit WAV, 48 kHz sampling rate
+* **Audio modalities**: Speech and Song
+* **Emotion categories**: 8 classes (Neutral, Calm, Happy, Sad, Angry, Fearful, Disgust, Surprised)
+* **Performers**: 24 professional actors (12 female, 12 male)
+* **Total samples**: Comprehensive audio recordings with varying intensities and statements
 
-Data files are organized by modality (`Speech/`, `Song/`), with filenames following:
+### Dataset Structure
+
+Each filename in RAVDESS follows a systematic naming convention:
 
 ```
 Modality-Vocal-Emotion-Intensity-Statement-Repetition-Actor.wav
 ```
 
----
+Fields encoded in the filename:
+
+* **Modality**: Full-AV, Video-only, Audio-only
+* **Vocal channel**: Speech, Song
+* **Emotion**: One of the 8 emotional states
+* **Intensity**: Normal, Strong
+* **Statement**: Two distinct phrases
+* **Repetition**: Multiple takes per condition
+* **Actor**: Performer ID (gender-balanced)
 
 ## Methodology
 
-### 1. Data Preprocessing
+### 1. Data Loading and Preprocessing
 
-* **Loading**: `librosa.load(..., sr=22050, duration=3.0)`
-* **Normalization**: Scale amplitude to \[-1, 1]
-* **Noise Reduction**: Optional spectral subtraction
-* **Augmentation**:
+#### Advanced RAVDESS Data Loader
 
-  * Gaussian noise (0.3%)
-  * Time stretching (0.85×–1.15×)
-  * Pitch shifting (±3 semitones)
-  * Applied to minority classes for balance
+* **Filename Structure Decoding**: Parse RAVDESS naming convention
+* **Metadata Extraction**: Extract gender, emotion, intensity, modality, and performer info
+* **Dataset Compilation**: Organize audio samples with metadata labels
 
-### 2. Feature Extraction
+#### Audio Processing Pipeline
 
-* **Mel-Spectrograms**: 64 mel bands → dB scale → normalization
-* **MFCCs**: 13 coefficients + delta + delta-delta
-* **RGB Conversion**: Stack spectrograms into 3 channels
+* **Sampling Rate**: Standardize to 22,050 Hz
+* **Duration Normalization**: Trim or pad to 3-second segments
+* **Signal Preprocessing**: Amplitude normalization and optional noise reduction
+* **Padding/Truncation**: Ensure consistent length across samples
 
-### 3. Model Architectures
+### 2. Feature Extraction System
 
-| Model     | Backbone    | Head Layers               | Optimizer (LR) |
-| --------- | ----------- | ------------------------- | -------------- |
-| ResNet101 | ResNet101V2 | GAP → 512 → 512 → 256 → 8 | Adam (1e-4)    |
-| VGG16     | VGG16       | GAP → 512 → 512 → 256 → 8 | Adam (1e-4)    |
-| VGG19     | VGG19       | GAP → 512 → 512 → 256 → 8 | Adam (1.55e-4) |
+#### Multi-Modal Feature Engineering
 
----
+**Mel-Spectrogram Features (CNN Input)**
 
-## Installation & Usage
+* 64 mel bands (0–8000 Hz)
+* Min-max scaling to \[0, 1]
+* 2D spectrograms compatible with image-based CNNs
 
-### Dependencies
+**MFCC Temporal Features (Sequential Models)**
 
-```bash
-pip install tensorflow librosa numpy pandas scikit-learn matplotlib soundfile noisereduce scipy
-```
+* 13 MFCC coefficients
+* Statistical aggregations: mean, standard deviation, first/second derivatives
+* 128-frame sequences → 52-dimensional feature vectors
 
-### Code Snippet
+**ResNet Input Preparation**
 
-Below is the core import and model-loading section for reference:
+* Convert single-channel spectrograms to 3-channel RGB
+* Resize to 224×224 pixels
+* Normalize pixel values to \[0, 1]
+
+### 3. Data Augmentation Strategy
+
+#### Smart Audio Augmentation System
+
+**Techniques:**
+
+* Gaussian noise injection (0.3% intensity)
+* Time stretching (0.85×–1.15×)
+* Pitch shifting (±3 semitones)
+
+**Intelligent Balancing:**
+
+* Targeted augmentation for minority classes
+* Quality control via temporary file management
+* Balanced training set creation
+
+### 4. Model Architectures
+
+#### ResNet101 Implementation
 
 ```python
-import os
-import pandas as pd
-import numpy as np
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
-import warnings
-warnings.filterwarnings('ignore')
-
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-# ... additional imports and model definitions ...
+# Backbone: ResNet101V2 (ImageNet pretrained)
+# Frozen convolutional layers
+# Head: GAP → 512 → 512 → 256 → num_classes
+# Dropout: 0.2 between dense layers
+# Activation: ReLU (hidden), Softmax (output)
 ```
 
-### Running the Pipeline
+#### VGG16 Implementation
 
-1. **Preprocess** the audio files to generate spectrogram images.
-2. **Train** each model with:
+```python
+# Backbone: VGG16 (ImageNet pretrained)
+# Frozen convolutional layers
+# Head: GAP → 512 → 512 → 256 → num_classes
+# Dropout: 0.2
+# Activation: ReLU (hidden), Softmax (output)
+```
 
-   ```bash
-   python train.py --model <ResNet101|VGG16|VGG19>
-   ```
-3. **Evaluate** using:
+#### VGG19 Implementation
 
-   ```bash
-   python evaluate.py --model <ResNet101|VGG16|VGG19>
-   ```
+```python
+# Backbone: VGG19 (ImageNet pretrained)
+# Extended depth
+# Head: GAP → 512 → 512 → 256 → num_classes
+# Dropout: 0.2
+# Activation: ReLU (hidden), Softmax (output)
+```
 
----
+### 5. Training Configuration
 
-## Evaluation Results
+#### Optimization Strategy
 
-### Overall Metrics
+* **Optimizer**: Adam
+* **Learning Rate**: 0.0001 (0.0001155 for VGG19)
+* **Batch Size**: 32
+* **Epochs**: Up to 100
+* **Class Weighting**: Balanced
 
-| Model     | Accuracy | Macro F1 | Weighted F1 | Macro Precision | Macro Recall |
-| --------- | -------- | -------- | ----------- | --------------- | ------------ |
-| ResNet101 | 57.84%   | 57.78%   | 57.37%      | 57.21%          | 59.07%       |
-| VGG16     | 59.06%   | 59.28%   | 57.56%      | 58.13%          | 61.93%       |
-| VGG19     | 59.88%   | 60.26%   | 59.27%      | 59.70%          | 61.53%       |
+#### Callbacks
 
-### Detailed Classification Reports
+* **EarlyStopping**: Patience=25 (monitor val\_accuracy)
+* **ReduceLROnPlateau**: Factor=0.3, Patience=7, Min LR=1e-4
+* **ModelCheckpoint**: Save best weights
 
-**ResNet101**
+### 6. Evaluation Methodology
+
+* **Stratified Split**: 80% train (with augmentation), 20% test (no augmentation)
+* **Metrics**:
+
+  * Accuracy
+  * Macro F1-score
+  * Weighted F1-score
+  * Precision, Recall
+  * Per-class analysis
+
+## Experimental Results
+
+### Model Performance Comparison
+
+| Model     | Accuracy   | Macro F1   | Weighted F1 | Macro Precision | Macro Recall |
+| --------- | ---------- | ---------- | ----------- | --------------- | ------------ |
+| **VGG19** | **0.5988** | **0.6026** | **0.5927**  | **0.5970**      | **0.6153**   |
+| VGG16     | 0.5906     | 0.5928     | 0.5756      | 0.5813          | 0.6193       |
+| ResNet101 | 0.5784     | 0.5778     | 0.5737      | 0.5721          | 0.5907       |
+
+### Detailed Per-Class Performance
+
+#### VGG19 (Best Model)
 
 | Emotion   | Precision | Recall | F1-Score | Support |
 | --------- | --------- | ------ | -------- | ------- |
-| Angry     | 0.6515    | 0.5733 | 0.6099   | 75      |
-| Calm      | 0.6374    | 0.7733 | 0.6988   | 75      |
-| Disgust   | 0.6047    | 0.6667 | 0.6341   | 39      |
-| Fearful   | 0.6429    | 0.6000 | 0.6207   | 75      |
-| Happy     | 0.5588    | 0.5067 | 0.5315   | 75      |
-| Neutral   | 0.4600    | 0.6053 | 0.5227   | 38      |
-| Sad       | 0.4167    | 0.3333 | 0.3704   | 75      |
-| Surprised | 0.6047    | 0.6667 | 0.6341   | 39      |
+| Angry     | 0.733     | 0.587  | 0.652    | 75      |
+| Calm      | 0.679     | 0.760  | 0.717    | 75      |
+| Disgust   | 0.545     | 0.615  | 0.578    | 39      |
+| Fearful   | 0.605     | 0.693  | 0.646    | 75      |
+| Happy     | 0.507     | 0.493  | 0.500    | 75      |
+| Neutral   | 0.619     | 0.684  | 0.650    | 38      |
+| Sad       | 0.421     | 0.320  | 0.364    | 75      |
+| Surprised | 0.667     | 0.769  | 0.714    | 39      |
 
-**VGG16**
-
-| Emotion   | Precision | Recall | F1-Score | Support |
-| --------- | --------- | ------ | -------- | ------- |
-| Angry     | 0.7385    | 0.6400 | 0.6857   | 75      |
-| Calm      | 0.6500    | 0.6933 | 0.6710   | 75      |
-| Disgust   | 0.6000    | 0.6923 | 0.6429   | 39      |
-| Fearful   | 0.5684    | 0.7200 | 0.6353   | 75      |
-| Happy     | 0.5231    | 0.4533 | 0.4857   | 75      |
-| Neutral   | 0.5814    | 0.6579 | 0.6173   | 38      |
-| Sad       | 0.3409    | 0.2000 | 0.2521   | 75      |
-| Surprised | 0.6481    | 0.8974 | 0.7527   | 39      |
-
-**VGG19**
+#### VGG16
 
 | Emotion   | Precision | Recall | F1-Score | Support |
 | --------- | --------- | ------ | -------- | ------- |
-| Angry     | 0.7333    | 0.5867 | 0.6519   | 75      |
-| Calm      | 0.6786    | 0.7600 | 0.7170   | 75      |
-| Disgust   | 0.5455    | 0.6154 | 0.5783   | 39      |
-| Fearful   | 0.6047    | 0.6933 | 0.6460   | 75      |
-| Happy     | 0.5068    | 0.4933 | 0.5000   | 75      |
-| Neutral   | 0.6190    | 0.6842 | 0.6500   | 38      |
-| Sad       | 0.4211    | 0.3200 | 0.3636   | 75      |
-| Surprised | 0.6667    | 0.7692 | 0.7143   | 39      |
+| Angry     | 0.738     | 0.640  | 0.686    | 75      |
+| Calm      | 0.650     | 0.693  | 0.671    | 75      |
+| Disgust   | 0.600     | 0.692  | 0.643    | 39      |
+| Fearful   | 0.568     | 0.720  | 0.635    | 75      |
+| Happy     | 0.523     | 0.453  | 0.486    | 75      |
+| Neutral   | 0.581     | 0.658  | 0.617    | 38      |
+| Sad       | 0.341     | 0.200  | 0.252    | 75      |
+| Surprised | 0.648     | 0.897  | 0.753    | 39      |
 
-**Key Findings**
+#### ResNet101
 
-* **Best Model**: VGG19 (59.88% accuracy, 60.26% macro F1)
-* **Highest F1**: Calm (up to 0.717), Surprised (up to 0.753)
-* **Most Challenging**: Sad (F1: 0.252–0.370)
+| Emotion   | Precision | Recall | F1-Score | Support |
+| --------- | --------- | ------ | -------- | ------- |
+| Angry     | 0.652     | 0.573  | 0.610    | 75      |
+| Calm      | 0.637     | 0.773  | 0.699    | 75      |
+| Disgust   | 0.605     | 0.667  | 0.634    | 39      |
+| Fearful   | 0.643     | 0.600  | 0.621    | 75      |
+| Happy     | 0.559     | 0.507  | 0.531    | 75      |
+| Neutral   | 0.460     | 0.605  | 0.523    | 38      |
+| Sad       | 0.417     | 0.333  | 0.370    | 75      |
+| Surprised | 0.605     | 0.667  | 0.634    | 39      |
 
----
+## Key Findings
 
-## Technical Implementation
-
-* **Languages**: Python 3.7+
-* **Frameworks**: TensorFlow/Keras 2.x
-* **Libraries**: librosa, scikit-learn, numpy, pandas, matplotlib
-* **Hardware**: CUDA-compatible GPU recommended
+* **Best Model**: VGG19 with 59.88% accuracy and 60.26% macro F1
+* **Top Emotions**: Calm (F1 up to 0.717), Surprised (F1 up to 0.753)
+* **Challenging**: Sad (F1 between 0.252–0.370)
 
 
+## Dependencies
+
+* TensorFlow/Keras 2.x
+* Librosa, NumPy, Pandas, Scikit-learn
+* Matplotlib, Seaborn, Plotly
+* SoundFile, SciPy, NoiseReduce
 
 
